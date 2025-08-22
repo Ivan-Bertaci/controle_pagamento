@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Pagamentos - DE Campinas Leste</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 220px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .header-bg {
+            background-color: #003366;
+        }
+        .btn-primary {
+            background-color: #003366;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #002244;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="header-bg shadow-md">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <svg class="h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a8 8 0 11-14.856 0M12 21a9 9 0 100-18 9 9 0 000 18z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.535V12l4.95 4.95" />
+                </svg>
+                <div>
+                    <h1 class="text-xl font-bold text-white">Diretoria de Ensino - Região Campinas Leste</h1>
+                    <p class="text-sm text-yellow-400">Governo do Estado de São Paulo</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Dashboard de Controle de Pagamentos</h1>
+            <p class="text-gray-600 mt-2">Faça o upload de notas de empenho em PDF para gerenciar os prazos de pagamento.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4 border-b pb-3 text-[#003366]">Carregar Nova Nota de Empenho</h2>
+            <div class="flex flex-col sm:flex-row items-center gap-4">
+                <input type="file" id="pdf-upload" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors duration-200 cursor-pointer">
+                <button id="process-pdf-btn" class="w-full sm:w-auto btn-primary font-bold py-2 px-6 rounded-lg hover:bg-[#002244] transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <span id="btn-text">Processar PDF</span>
+                    <span id="btn-loader" class="hidden">Processando...</span>
+                </button>
+            </div>
+             <p id="extraction-note" class="text-xs text-gray-500 mt-3">
+                <span class="font-semibold">Nota:</span> A extração de dados do PDF é uma simulação. Para testar a nova funcionalidade, o processamento irá gerar um exemplo com cronograma de múltiplos meses.
+            </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-[#003366]">Registros de Pagamento</h2>
+                <button id="export-csv-btn" class="mt-4 md:mt-0 w-full md:w-auto btn-primary font-bold py-2 px-5 rounded-lg hover:bg-[#002244] transition-all duration-200">Exportar para Excel (CSV)</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-blue-50">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Nº Empenho</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Nº Processo</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Credor</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">CNPJ</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Valor da Parcela</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Fonte</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Cronograma</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase tooltip">Data Emissão NF
+                                <span class="tooltiptext">Insira a data de emissão da Nota Fiscal para calcular o vencimento.</span>
+                            </th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Vencimento</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Status</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payment-table-body" class="text-gray-700">
+                         <tr><td colspan="11" class="text-center py-10 text-gray-500">Nenhum registro encontrado. Carregue um PDF para começar.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-10 text-gray-500 text-sm">
+            <p>&copy; 2024 Governo do Estado de São Paulo. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        // Configuração do Firebase (substituída em ambiente real)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        setLogLevel('debug');
+
+        let userId = null;
+        let paymentData = [];
+        
+        const processPdfBtn = document.getElementById('process-pdf-btn');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const tableBody = document.getElementById('payment-table-body');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnLoader = document.getElementById('btn-loader');
+
+        // Autenticação anônima
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("User is signed in with uid:", userId);
+                loadPayments();
+            } else {
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Error signing in anonymously:", error);
+                });
+            }
+        });
+
+        function loadPayments() {
+            if (!userId) return;
+            const paymentsCollection = collection(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`);
+            
+            onSnapshot(paymentsCollection, (snapshot) => {
+                paymentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderTable();
+            });
+        }
+
+        function renderTable() {
+            tableBody.innerHTML = '';
+            if (paymentData.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="11" class="text-center py-10 text-gray-500">Nenhum registro encontrado. Carregue um PDF para começar.</td></tr>';
+                 return;
+            }
+
+            paymentData.sort((a, b) => a.empenho.localeCompare(b.empenho) || a.cronogramaMes.localeCompare(b.cronogramaMes));
+
+            paymentData.forEach(item => {
+                const dueDate = item.invoiceDate ? new Date(item.invoiceDate) : null;
+                if (dueDate) {
+                    dueDate.setDate(dueDate.getDate() + 31);
+                }
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let statusClass = 'bg-white';
+                
+                if (item.status === 'Pago') {
+                    statusClass = 'bg-green-100';
+                } else if (dueDate) {
+                    const timeDiff = dueDate.getTime() - today.getTime();
+                    const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                    if (dayDiff < 0) {
+                        statusClass = 'bg-red-100';
+                    } else if (dayDiff <= 7) {
+                        statusClass = 'bg-yellow-100';
+                    }
+                }
+
+                const row = document.createElement('tr');
+                row.className = `${statusClass} border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150`;
+                row.innerHTML = `
+                    <td class="py-3 px-4 font-medium">${item.empenho || 'N/A'}</td>
+                    <td class="py-3 px-4">${item.processo || 'N/A'}</td>
+                    <td class="py-3 px-4">${item.credor || 'N/A'}</td>
+                    <td class="py-3 px-4">${item.cnpj || 'N/A'}</td>
+                    <td class="py-3 px-4">R$ ${parseFloat(item.valor || 0).toFixed(2)}</td>
+                    <td class="py-3 px-4">${item.fonte || 'N/A'}</td>
+                    <td class="py-3 px-4">Mês ${item.cronogramaMes || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <input type="date" value="${item.invoiceDate || ''}" data-id="${item.id}" class="invoice-date-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
+                    </td>
+                    <td class="py-3 px-4">${dueDate ? dueDate.toLocaleDateString('pt-BR') : 'Aguardando NF'}</td>
+                    <td class="py-3 px-4">
+                        <select data-id="${item.id}" class="status-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
+                            <option value="Pendente" ${item.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                            <option value="Pago" ${item.status === 'Pago' ? 'selected' : ''}>Pago</option>
+                        </select>
+                    </td>
+                    <td class="py-3 px-4">
+                        <button data-id="${item.id}" class="delete-btn text-red-500 hover:text-red-700 font-semibold">Excluir</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        async function simulatePdfExtraction(file) {
+            console.log("Simulating data extraction for file:", file.name);
+            
+            const cnpjRaw = "36381402881-JEFFERSON PRATAVIEIRA";
+            const cnpjNumbers = cnpjRaw.match(/\d+/)[0];
+
+            return {
+                empenho: '2025NE00816',
+                credor: 'FORNECEDOR MULTI-PARCELA',
+                fonte: '150010001',
+                processo: '20250633762',
+                cnpj: '12345678000199',
+                cronogramas: [
+                    { mes: '06', valor: '150.00' },
+                    { mes: '07', valor: '250.00' },
+                    { mes: '08', valor: '100.00' }
+                ]
+            };
+        }
+        
+        processPdfBtn.addEventListener('click', async () => {
+            if (!pdfUpload.files || pdfUpload.files.length === 0) {
+                alert('Por favor, selecione um arquivo PDF.');
+                return;
+            }
+            if (!userId) {
+                alert('Erro de autenticação. Tente recarregar a página.');
+                return;
+            }
+
+            btnText.classList.add('hidden');
+            btnLoader.classList.remove('hidden');
+            processPdfBtn.disabled = true;
+
+            try {
+                const file = pdfUpload.files[0];
+                const extractedData = await simulatePdfExtraction(file);
+                
+                const { cronogramas, ...commonData } = extractedData;
+                
+                const paymentsCollection = collection(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`);
+
+                const promises = cronogramas.map(crono => {
+                    const newPayment = {
+                        ...commonData,
+                        cronogramaMes: crono.mes,
+                        valor: crono.valor,
+                        invoiceDate: '',
+                        status: 'Pendente',
+                        createdAt: new Date().toISOString()
+                    };
+                    return addDoc(paymentsCollection, newPayment);
+                });
+
+                await Promise.all(promises);
+                
+                pdfUpload.value = '';
+            } catch (error) {
+                console.error("Error processing PDF and adding to Firestore:", error);
+                alert('Ocorreu um erro ao processar o arquivo.');
+            } finally {
+                btnText.classList.remove('hidden');
+                btnLoader.classList.add('hidden');
+                processPdfBtn.disabled = false;
+            }
+        });
+
+        tableBody.addEventListener('change', async (e) => {
+            const target = e.target;
+            const id = target.dataset.id;
+            if (!id || !userId) return;
+
+            const docRef = doc(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`, id);
+
+            if (target.classList.contains('invoice-date-input')) {
+                await updateDoc(docRef, { invoiceDate: target.value });
+            } else if (target.classList.contains('status-select')) {
+                await updateDoc(docRef, { status: target.value });
+            }
+        });
+        
+        tableBody.addEventListener('click', async (e) => {
+             if (e.target.classList.contains('delete-btn')) {
+                const id = e.target.dataset.id;
+                if (confirm('Tem certeza que deseja excluir este registro?')) {
+                    const docRef = doc(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`, id);
+                    await deleteDoc(docRef);
+                }
+             }
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            if (paymentData.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            const headers = ['Nº Empenho', 'Nº Processo', 'Credor', 'CNPJ', 'Valor da Parcela', 'Fonte', 'Mês do Cronograma', 'Data Emissão NF', 'Data Vencimento', 'Status'];
+            const rows = paymentData.map(item => {
+                 const dueDate = item.invoiceDate ? new Date(item.invoiceDate) : null;
+                if (dueDate) {
+                    dueDate.setDate(dueDate.getDate() + 31);
+                }
+                return [
+                    item.empenho,
+                    item.processo,
+                    item.credor,
+                    item.cnpj,
+                    parseFloat(item.valor).toFixed(2),
+                    item.fonte,
+                    item.cronogramaMes,
+                    item.invoiceDate ? new Date(item.invoiceDate + 'T00:00:00-03:00').toLocaleDateString('pt-BR') : '',
+                    dueDate ? dueDate.toLocaleDateString('pt-BR') : '',
+                    item.status
+                ].join(',');
+            });
+
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "controle_pagamentos.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+    </script>
+</body>
+</html>
