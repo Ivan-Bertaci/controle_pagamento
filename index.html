@@ -50,6 +50,13 @@
         .btn-primary:hover {
             background-color: #002244;
         }
+        .filter-input {
+            width: 100%;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -62,7 +69,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.535V12l4.95 4.95" />
                 </svg>
                 <div>
-                    <h1 class="text-xl font-bold text-white">Diretoria de Ensino - Região Campinas Leste</h1>
+                    <h1 class="text-xl font-bold text-white">Unidade Regional de Ensino - Campinas Leste</h1>
                     <p class="text-sm text-yellow-400">Governo do Estado de São Paulo</p>
                 </div>
             </div>
@@ -71,7 +78,7 @@
 
     <div class="container mx-auto p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Dashboard de Controle de Pagamentos</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Controle de Pagamentos</h1>
             <p class="text-gray-600 mt-2">Faça o upload de notas de empenho em PDF para gerenciar os prazos de pagamento.</p>
         </header>
 
@@ -95,7 +102,7 @@
                 <button id="export-csv-btn" class="mt-4 md:mt-0 w-full md:w-auto btn-primary font-bold py-2 px-5 rounded-lg hover:bg-[#002244] transition-all duration-200">Exportar para Excel (CSV)</button>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full bg-white">
+                <table class="min-w-full bg-white" id="main-table">
                     <thead class="bg-blue-50">
                         <tr>
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Nº Empenho</th>
@@ -111,6 +118,25 @@
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Vencimento</th>
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Status</th>
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Ações</th>
+                        </tr>
+                        <tr id="filter-row">
+                            <th class="p-2"><input type="text" class="filter-input" data-column="empenho" placeholder="Filtrar..."></th>
+                            <th class="p-2"><input type="text" class="filter-input" data-column="processo" placeholder="Filtrar..."></th>
+                            <th class="p-2"><input type="text" class="filter-input" data-column="credor" placeholder="Filtrar..."></th>
+                            <th class="p-2"><input type="text" class="filter-input" data-column="cnpj" placeholder="Filtrar..."></th>
+                            <th class="p-2"></th>
+                            <th class="p-2"><input type="text" class="filter-input" data-column="fonte" placeholder="Filtrar..."></th>
+                            <th class="p-2"><input type="text" class="filter-input" data-column="cronogramaMes" placeholder="Mês..."></th>
+                            <th class="p-2"></th>
+                            <th class="p-2"></th>
+                            <th class="p-2">
+                                <select class="filter-input" data-column="status">
+                                    <option value="">Todos</option>
+                                    <option value="Pendente">Pendente</option>
+                                    <option value="Pago">Pago</option>
+                                </select>
+                            </th>
+                            <th class="p-2"></th>
                         </tr>
                     </thead>
                     <tbody id="payment-table-body" class="text-gray-700">
@@ -133,12 +159,12 @@
 
         // Cole aqui a configuração do seu projeto Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyAug2vBKE26YBtryqZyE53Z77INvpuAuPs",
-            authDomain: "controle-pagamento-5793e.firebaseapp.com",
-            projectId: "controle-pagamento-5793e",
-            storageBucket: "controle-pagamento-5793e.firebasestorage.app",
-            messagingSenderId: "1007302112586",
-            appId: "1:1007302112586:web:eebc1439c890041920fdb3"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
         
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
@@ -155,6 +181,7 @@
         const exportCsvBtn = document.getElementById('export-csv-btn');
         const btnText = document.getElementById('btn-text');
         const btnLoader = document.getElementById('btn-loader');
+        const mainTable = document.getElementById('main-table');
 
         // Autenticação anônima
         onAuthStateChanged(auth, (user) => {
@@ -175,20 +202,48 @@
             
             onSnapshot(paymentsCollection, (snapshot) => {
                 paymentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderTable();
+                applyFilters();
             });
         }
 
-        function renderTable() {
+        function applyFilters() {
+            const filterInputs = document.querySelectorAll('#filter-row .filter-input');
+            let filteredData = [...paymentData];
+
+            filterInputs.forEach(input => {
+                const column = input.dataset.column;
+                const value = input.value.toLowerCase();
+                if (value) {
+                    filteredData = filteredData.filter(item => {
+                        return item[column]?.toString().toLowerCase().includes(value);
+                    });
+                }
+            });
+            renderTable(filteredData);
+        }
+
+        mainTable.addEventListener('keyup', (e) => {
+            if (e.target.classList.contains('filter-input')) {
+                applyFilters();
+            }
+        });
+        
+        mainTable.addEventListener('change', (e) => {
+            if (e.target.classList.contains('filter-input')) {
+                applyFilters();
+            }
+        });
+
+        function renderTable(dataToRender) {
             tableBody.innerHTML = '';
-            if (paymentData.length === 0) {
-                 tableBody.innerHTML = '<tr><td colspan="11" class="text-center py-10 text-gray-500">Nenhum registro encontrado. Carregue um PDF para começar.</td></tr>';
+            if (dataToRender.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="11" class="text-center py-10 text-gray-500">Nenhum registro correspondente aos filtros.</td></tr>';
                  return;
             }
 
-            paymentData.sort((a, b) => a.empenho.localeCompare(b.empenho) || a.cronogramaMes.localeCompare(b.cronogramaMes));
+            dataToRender.sort((a, b) => a.empenho.localeCompare(b.empenho) || a.cronogramaMes.localeCompare(b.cronogramaMes));
 
-            paymentData.forEach(item => {
+            dataToRender.forEach(item => {
                 const dueDate = item.invoiceDate ? new Date(item.invoiceDate) : null;
                 if (dueDate) {
                     dueDate.setDate(dueDate.getDate() + 31);
@@ -278,12 +333,9 @@
                         const data = {};
                         const fullText = textItems.map(item => item.str).join(' ');
                         
-                        // Corrected Regex for Empenho to accept SIAFEM or SIAFISICO
                         data.empenho = fullText.match(/NOTA DE EMPENHO - (?:SIAFEM|SIAFISICO) - (\d{4}NE\d{5})/)?.[1] || 'Não encontrado';
                         data.credor = findValue(/Credor/i, /[A-Z\s\d-]+/) || 'Não encontrado';
                         data.cnpj = (findValue(/CNPJ\/CPF\/UG/i, /[\d-]+/) || '').match(/\d+/)?.[0] || 'Não encontrado';
-                        
-                        // Corrected logic for Processo
                         data.processo = findValue(/No Processo/i, /^[\d\/]+$/, 'right') || findValue(/No Processo/i, /^[\d\/]+$/, 'below') || 'Não encontrado';
                         
                         const fonteHeader = textItems.find(item => /Fonte/.test(item.str));
