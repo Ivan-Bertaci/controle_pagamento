@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>
+      // Required by pdf.js
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
+    </script>
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -81,7 +85,7 @@
                 </button>
             </div>
              <p id="extraction-note" class="text-xs text-gray-500 mt-3">
-                <span class="font-semibold">Nota:</span> A extração de dados do PDF é uma simulação. Para testar a nova funcionalidade, o processamento irá gerar um exemplo com cronograma de múltiplos meses.
+                <span class="font-semibold">Nota:</span> A extração de dados funciona melhor com PDFs baseados em texto e com layout similar ao da nota de empenho de exemplo.
             </p>
         </div>
 
@@ -127,15 +131,15 @@
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        // Configuração do Firebase (substituída em ambiente real)
+        // Cole aqui a configuração do seu projeto Firebase
         const firebaseConfig = {
-  		apiKey: "AIzaSyAug2vBKE26YBtryqZyE53Z77INvpuAuPs",
-  		authDomain: "controle-pagamento-5793e.firebaseapp.com",
-  		projectId: "controle-pagamento-5793e",
-  		storageBucket: "controle-pagamento-5793e.firebasestorage.app",
-  		messagingSenderId: "1007302112586",
-  		appId: "1:1007302112586:web:eebc1439c890041920fdb3"
-	    };
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
         
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
         const db = getFirestore(app);
@@ -235,27 +239,111 @@
                 tableBody.appendChild(row);
             });
         }
-
-        async function simulatePdfExtraction(file) {
-            console.log("Simulating data extraction for file:", file.name);
-            
-            const cnpjRaw = "36381402881-JEFFERSON PRATAVIEIRA";
-            const cnpjNumbers = cnpjRaw.match(/\d+/)[0];
-
-            return {
-                empenho: '2025NE00816',
-                credor: 'FORNECEDOR MULTI-PARCELA',
-                fonte: '150010001',
-                processo: '20250633762',
-                cnpj: '12345678000199',
-                cronogramas: [
-                    { mes: '06', valor: '150.00' },
-                    { mes: '07', valor: '250.00' },
-                    { mes: '08', valor: '100.00' }
-                ]
-            };
-        }
         
+        async function extractPdfData(file) {
+            const fileReader = new FileReader();
+            return new Promise((resolve, reject) => {
+                fileReader.onload = async function() {
+                    try {
+                        const typedarray = new Uint8Array(this.result);
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        let textItems = [];
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            textItems.push(...textContent.items);
+                        }
+
+                        const findValue = (labelRegex, valueRegex = /.*/, direction = 'right') => {
+                            const labelIndex = textItems.findIndex(item => labelRegex.test(item.str));
+                            if (labelIndex === -1) return null;
+                            const labelItem = textItems[labelIndex];
+
+                            if (direction === 'right') {
+                                for (let i = labelIndex + 1; i < textItems.length; i++) {
+                                    if (Math.abs(textItems[i].transform[5] - labelItem.transform[5]) < 5 && valueRegex.test(textItems[i].str.trim())) {
+                                        return textItems[i].str.trim();
+                                    }
+                                }
+                            } else if (direction === 'below') {
+                                for (let i = labelIndex + 1; i < textItems.length; i++) {
+                                    if (Math.abs(textItems[i].transform[4] - labelItem.transform[4]) < 40 && valueRegex.test(textItems[i].str.trim())) {
+                                        return textItems[i].str.trim();
+                                    }
+                                }
+                            }
+                            return null;
+                        };
+
+                        const data = {};
+                        const fullText = textItems.map(item => item.str).join(' ');
+                        
+                        // Corrected Regex for Empenho to accept SIAFEM or SIAFISICO
+                        data.empenho = fullText.match(/NOTA DE EMPENHO - (?:SIAFEM|SIAFISICO) - (\d{4}NE\d{5})/)?.[1] || 'Não encontrado';
+                        data.credor = findValue(/Credor/i, /[A-Z\s\d-]+/) || 'Não encontrado';
+                        data.cnpj = (findValue(/CNPJ\/CPF\/UG/i, /[\d-]+/) || '').match(/\d+/)?.[0] || 'Não encontrado';
+                        
+                        // Corrected logic for Processo
+                        data.processo = findValue(/No Processo/i, /^[\d\/]+$/, 'right') || findValue(/No Processo/i, /^[\d\/]+$/, 'below') || 'Não encontrado';
+                        
+                        const fonteHeader = textItems.find(item => /Fonte/.test(item.str));
+                        if (fonteHeader) {
+                            const itemsBelow = textItems.filter(item => item.transform[5] < fonteHeader.transform[5] && Math.abs(item.transform[4] - fonteHeader.transform[4]) < 15);
+                            if(itemsBelow.length > 0) data.fonte = itemsBelow[0].str.trim();
+                        }
+                        if (!data.fonte || data.fonte === 'Não encontrado') {
+                            data.fonte = fullText.match(/Fonte\s+Natureza Despesa[\s\S]*?(\d{9})/)?.[1] || 'Não encontrado';
+                        }
+
+
+                        data.cronogramas = [];
+                        const cronogramaHeader = textItems.find(item => /Cronograma/i.test(item.str));
+                        if (cronogramaHeader) {
+                            const mesHeader = textItems.find(item => /Mês/.test(item.str) && item.transform[5] < cronogramaHeader.transform[5]);
+                            const valorHeader = textItems.find(item => /Valor/.test(item.str) && mesHeader && Math.abs(item.transform[5] - mesHeader.transform[5]) < 5);
+
+                            if (mesHeader && valorHeader) {
+                                const itemsBelow = textItems.filter(item => item.transform[5] < mesHeader.transform[5]);
+                                const months = itemsBelow.filter(item => Math.abs(item.transform[4] - mesHeader.transform[4]) < 15).sort((a,b) => b.transform[5] - a.transform[5]);
+                                const values = itemsBelow.filter(item => Math.abs(item.transform[4] - valorHeader.transform[4]) < 15).sort((a,b) => b.transform[5] - a.transform[5]);
+
+                                months.forEach(month => {
+                                    const value = values.find(v => Math.abs(v.transform[5] - month.transform[5]) < 5);
+                                    if(value && /^\d{2}$/.test(month.str.trim())) {
+                                        data.cronogramas.push({
+                                            mes: month.str.trim(),
+                                            valor: value.str.trim().replace(/\./g, '').replace(',', '.')
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                        
+                        if (data.cronogramas.length === 0) {
+                           const valorTotalMatch = fullText.match(/Valor do Empenho R\$\s+([\d.,]+)/);
+                           if (valorTotalMatch) {
+                               const valorTotal = valorTotalMatch[1].replace(/\./g, '').replace(',', '.');
+                               const dataEmissaoStr = fullText.match(/Data de Emissão\s+(\d{2}[A-Z]{3}\d{4})/)?.[1];
+                               let mesNumero = 'N/A';
+                               if (dataEmissaoStr) {
+                                   const mesEmissao = dataEmissaoStr.substring(2, 5);
+                                   const monthMap = { 'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12' };
+                                   mesNumero = monthMap[mesEmissao] || 'N/A';
+                               }
+                               data.cronogramas.push({ mes: mesNumero, valor: valorTotal });
+                           }
+                        }
+                        
+                        resolve(data);
+
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            });
+        }
+
         processPdfBtn.addEventListener('click', async () => {
             if (!pdfUpload.files || pdfUpload.files.length === 0) {
                 alert('Por favor, selecione um arquivo PDF.');
@@ -272,8 +360,12 @@
 
             try {
                 const file = pdfUpload.files[0];
-                const extractedData = await simulatePdfExtraction(file);
+                const extractedData = await extractPdfData(file);
                 
+                if (!extractedData || !extractedData.cronogramas || extractedData.cronogramas.length === 0) {
+                    throw new Error("Não foi possível extrair os dados do cronograma do PDF.");
+                }
+
                 const { cronogramas, ...commonData } = extractedData;
                 
                 const paymentsCollection = collection(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`);
@@ -295,7 +387,7 @@
                 pdfUpload.value = '';
             } catch (error) {
                 console.error("Error processing PDF and adding to Firestore:", error);
-                alert('Ocorreu um erro ao processar o arquivo.');
+                alert('Ocorreu um erro ao processar o arquivo. Verifique se o PDF tem um formato válido.');
             } finally {
                 btnText.classList.remove('hidden');
                 btnLoader.classList.add('hidden');
