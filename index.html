@@ -166,7 +166,10 @@
             messagingSenderId: "1007302112586",
             appId: "1:1007302112586:web:eebc1439c890041920fdb3"
         };
-        
+
+        // ADICIONE ESTA LINHA ABAIXO
+        console.log("CONFIGURAÇÃO ATUAL:", firebaseConfig);
+             
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
         const db = getFirestore(app);
         const auth = getAuth(app);
