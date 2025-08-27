@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -159,21 +159,20 @@
 
         // Cole aqui a configuração do seu projeto Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyAug2vBKE26YBtryqZyE53Z77INvpuAuPs",
-            authDomain: "controle-pagamento-5793e.firebaseapp.com",
-            projectId: "controle-pagamento-5793e",
-            storageBucket: "controle-pagamento-5793e.firebasestorage.app",
-            messagingSenderId: "1007302112586",
-            appId: "1:1007302112586:web:eebc1439c890041920fdb3"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
         
-        // CORREÇÃO: Lógica de inicialização restaurada para funcionar em ambos os ambientes
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
         const db = getFirestore(app);
         const auth = getAuth(app);
         setLogLevel('debug');
 
-        let userId = null;
+        let userIsAuthenticated = false;
         let paymentData = [];
         
         const processPdfBtn = document.getElementById('process-pdf-btn');
@@ -187,8 +186,8 @@
         // Autenticação anônima
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                userId = user.uid;
-                console.log("User is signed in with uid:", userId);
+                userIsAuthenticated = true;
+                console.log("User is authenticated with uid:", user.uid);
                 loadPayments();
             } else {
                 signInAnonymously(auth).catch((error) => {
@@ -198,8 +197,9 @@
         });
 
         function loadPayments() {
-            if (!userId) return;
-            const paymentsCollection = collection(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`);
+            if (!userIsAuthenticated) return;
+            // CORREÇÃO: Usando uma coleção compartilhada
+            const paymentsCollection = collection(db, "shared_payments");
             
             onSnapshot(paymentsCollection, (snapshot) => {
                 paymentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -402,7 +402,7 @@
                 alert('Por favor, selecione um arquivo PDF.');
                 return;
             }
-            if (!userId) {
+            if (!userIsAuthenticated) {
                 alert('Erro de autenticação. Tente recarregar a página.');
                 return;
             }
@@ -421,7 +421,8 @@
 
                 const { cronogramas, ...commonData } = extractedData;
                 
-                const paymentsCollection = collection(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`);
+                // CORREÇÃO: Usando uma coleção compartilhada
+                const paymentsCollection = collection(db, "shared_payments");
 
                 const promises = cronogramas.map(crono => {
                     const newPayment = {
@@ -451,9 +452,10 @@
         tableBody.addEventListener('change', async (e) => {
             const target = e.target;
             const id = target.dataset.id;
-            if (!id || !userId) return;
-
-            const docRef = doc(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`, id);
+            if (!id || !userIsAuthenticated) return;
+            
+            // CORREÇÃO: Usando uma coleção compartilhada
+            const docRef = doc(db, "shared_payments", id);
 
             if (target.classList.contains('invoice-date-input')) {
                 await updateDoc(docRef, { invoiceDate: target.value });
@@ -466,7 +468,8 @@
              if (e.target.classList.contains('delete-btn')) {
                 const id = e.target.dataset.id;
                 if (confirm('Tem certeza que deseja excluir este registro?')) {
-                    const docRef = doc(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/payments`, id);
+                    // CORREÇÃO: Usando uma coleção compartilhada
+                    const docRef = doc(db, "shared_payments", id);
                     await deleteDoc(docRef);
                 }
              }
