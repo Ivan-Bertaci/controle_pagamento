@@ -167,6 +167,7 @@
             appId: "YOUR_APP_ID"
         };
         
+        // CORREÇÃO: Lógica de inicialização restaurada para funcionar em ambos os ambientes
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
         const db = getFirestore(app);
         const auth = getAuth(app);
