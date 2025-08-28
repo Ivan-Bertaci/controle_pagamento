@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -183,27 +183,46 @@
         const btnLoader = document.getElementById('btn-loader');
         const mainTable = document.getElementById('main-table');
 
-        // Autenticação anônima
+        // Autenticação com diagnóstico de erro detalhado
+        async function authenticateUser() {
+            try {
+                const userCredential = await signInAnonymously(auth);
+                const user = userCredential.user;
+                if (user) {
+                    userIsAuthenticated = true;
+                    console.log("Authentication successful. User UID:", user.uid);
+                    loadPayments();
+                }
+            } catch (error) {
+                console.error("FIREBASE AUTHENTICATION FAILED:", error);
+                // Exibe o erro detalhado do Firebase
+                alert(`Erro de Autenticação do Firebase:\n\nCódigo: ${error.code}\n\nMensagem: ${error.message}\n\nPor favor, verifique a configuração do seu projeto Firebase e os domínios autorizados.`);
+            }
+        }
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                userIsAuthenticated = true;
-                console.log("User is authenticated with uid:", user.uid);
-                loadPayments();
+                if (!userIsAuthenticated) {
+                    userIsAuthenticated = true;
+                    console.log("User is already authenticated. UID:", user.uid);
+                    loadPayments();
+                }
             } else {
-                signInAnonymously(auth).catch((error) => {
-                    console.error("Error signing in anonymously:", error);
-                });
+                console.log("No user found, attempting anonymous sign-in...");
+                authenticateUser();
             }
         });
 
         function loadPayments() {
             if (!userIsAuthenticated) return;
-            // CORREÇÃO: Usando uma coleção compartilhada
             const paymentsCollection = collection(db, "shared_payments");
             
             onSnapshot(paymentsCollection, (snapshot) => {
                 paymentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 applyFilters();
+            }, (error) => {
+                console.error("Erro ao carregar dados do Firestore:", error);
+                alert("Não foi possível carregar os dados. Verifique as regras de segurança do Firestore.");
             });
         }
 
@@ -403,7 +422,8 @@
                 return;
             }
             if (!userIsAuthenticated) {
-                alert('Erro de autenticação. Tente recarregar a página.');
+                // A mensagem de erro detalhada já terá sido mostrada na inicialização
+                alert('A autenticação falhou. Não é possível processar o arquivo.');
                 return;
             }
 
@@ -421,7 +441,6 @@
 
                 const { cronogramas, ...commonData } = extractedData;
                 
-                // CORREÇÃO: Usando uma coleção compartilhada
                 const paymentsCollection = collection(db, "shared_payments");
 
                 const promises = cronogramas.map(crono => {
@@ -454,7 +473,6 @@
             const id = target.dataset.id;
             if (!id || !userIsAuthenticated) return;
             
-            // CORREÇÃO: Usando uma coleção compartilhada
             const docRef = doc(db, "shared_payments", id);
 
             if (target.classList.contains('invoice-date-input')) {
@@ -468,7 +486,6 @@
              if (e.target.classList.contains('delete-btn')) {
                 const id = e.target.dataset.id;
                 if (confirm('Tem certeza que deseja excluir este registro?')) {
-                    // CORREÇÃO: Usando uma coleção compartilhada
                     const docRef = doc(db, "shared_payments", id);
                     await deleteDoc(docRef);
                 }
