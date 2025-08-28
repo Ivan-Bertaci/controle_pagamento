@@ -64,12 +64,8 @@
     <header class="header-bg shadow-md">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-4">
-                <svg class="h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a8 8 0 11-14.856 0M12 21a9 9 0 100-18 9 9 0 000 18z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.535V12l4.95 4.95" />
-                </svg>
                 <div>
-                    <h1 class="text-xl font-bold text-white">Diretoria de Ensino - Região Campinas Leste</h1>
+                    <h1 class="text-xl font-bold text-white">Unidade Regional de Ensino - Campinas Leste</h1>
                     <p class="text-sm text-yellow-400">Governo do Estado de São Paulo</p>
                 </div>
             </div>
@@ -116,7 +112,7 @@
                                 <span class="tooltiptext">Insira a data de emissão da Nota Fiscal para calcular o vencimento.</span>
                             </th>
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Vencimento</th>
-                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Status</th>
+                            <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase w-40">Status</th>
                             <th class="py-3 px-4 text-left text-xs font-bold text-[#003366] uppercase">Ações</th>
                         </tr>
                         <tr id="filter-row">
@@ -129,7 +125,7 @@
                             <th class="p-2"><input type="text" class="filter-input" data-column="cronogramaMes" placeholder="Mês..."></th>
                             <th class="p-2"></th>
                             <th class="p-2"></th>
-                            <th class="p-2">
+                            <th class="p-2 w-40">
                                 <select class="filter-input" data-column="status">
                                     <option value="">Todos</option>
                                     <option value="Pendente">Pendente</option>
@@ -159,15 +155,14 @@
 
         // Cole aqui a configuração do seu projeto Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyAug2vBKE26YBtryqZyE53Z77INvpuAuPs",
-            authDomain: "controle-pagamento-5793e.firebaseapp.com",
-            projectId: "controle-pagamento-5793e",
-            storageBucket: "controle-pagamento-5793e.firebasestorage.app",
-            messagingSenderId: "1007302112586",
-            appId: "1:1007302112586:web:eebc1439c890041920fdb3"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
         
-        // CORREÇÃO: Lógica de inicialização restaurada para funcionar em ambos os ambientes
         const app = initializeApp(JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(firebaseConfig)));
         const db = getFirestore(app);
         const auth = getAuth(app);
@@ -196,7 +191,6 @@
                 }
             } catch (error) {
                 console.error("FIREBASE AUTHENTICATION FAILED:", error);
-                // Exibe o erro detalhado do Firebase
                 alert(`Erro de Autenticação do Firebase:\n\nCódigo: ${error.code}\n\nMensagem: ${error.message}\n\nPor favor, verifique a configuração do seu projeto Firebase e os domínios autorizados.`);
             }
         }
